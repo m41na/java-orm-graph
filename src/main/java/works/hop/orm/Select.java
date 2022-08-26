@@ -164,42 +164,38 @@ public class Select {
     public static void main(String[] args) throws Throwable {
         EntityGen gen = new EntityGen();
         Map<String, EntityNode> mappings = gen.entities();
-//        Object[][] criteria = new Object[1][];
+        Object[][] criteria = new Object[1][];
         Transact tx = Connect.transact();
-//        tx.start(conn -> selectAll(conn, "tbl_address", mappings).forEach(System.out::println));
-//
-//        tx.start(conn -> {
-//            criteria[0] = new Object[]{"id", 1};
-//            Object address = selectOneWhere(conn, "tbl_address", criteria, mappings);
-//            System.out.println(address);
-//        });
-//
-//        tx.start(conn -> {
-//            criteria[0] = new Object[]{"id", 2};
-//            selectListWhere(conn, "tbl_seller", criteria, mappings).forEach(System.out::println);
-//        });
-//
-//        tx.start(conn -> {
-//            criteria[0] = new Object[]{"item_seller", 2};
-//            selectListWhere(conn, "tbl_sale_item", criteria, mappings).forEach(System.out::println);
-//        });
-//
-//        tx.start(conn -> {
-//            Object[][] criteria = new Object[2][];
-//            criteria[0] = new Object[]{"title", "mel baby"};
-//            criteria[1] = new Object[]{"artist", "melissa"};
-//            selectListWhere(conn, "tbl_music_album", criteria, mappings).forEach(System.out::println);
-//        });
-//
-//        tx.start(conn -> {
-//            Object[][] criteria = new Object[1][];
-//            criteria[0] = new Object[]{"album", "mel baby"};
-//            criteria[0] = new Object[]{"artist", "melissa"};
-//            selectListWhere(conn, "tbl_songs", criteria, mappings).forEach(System.out::println);
-//        });
+        tx.start(conn -> selectAll(conn, "tbl_address", mappings).forEach(System.out::println));
 
         tx.start(conn -> {
-            selectAll(conn, "tbl_requested", mappings).forEach(System.out::println);
+            criteria[0] = new Object[]{"id", 1};
+            Object address = selectOneWhere(conn, "tbl_address", criteria, mappings);
+            System.out.println(address);
         });
+
+        tx.start(conn -> {
+            criteria[0] = new Object[]{"id", 2};
+            selectListWhere(conn, "tbl_seller", criteria, mappings).forEach(System.out::println);
+        });
+
+        tx.start(conn -> {
+            criteria[0] = new Object[]{"item_seller", 2};
+            selectListWhere(conn, "tbl_sale_item", criteria, mappings).forEach(System.out::println);
+        });
+
+        tx.start(conn -> {
+            Object[][] criteria1 = new Object[2][];
+            criteria1[0] = new Object[]{"title", "mel baby"};
+            criteria1[1] = new Object[]{"artist", "melissa"};
+            selectListWhere(conn, "tbl_music_album", criteria1, mappings).forEach(System.out::println);
+        });
+
+        tx.start(conn -> {
+            criteria[0] = new Object[]{"album", "mel baby"};
+            selectListWhere(conn, "tbl_songs", criteria, mappings).forEach(System.out::println);
+        });
+
+        tx.start(conn -> selectAll(conn, "tbl_requested", mappings).forEach(System.out::println));
     }
 }
