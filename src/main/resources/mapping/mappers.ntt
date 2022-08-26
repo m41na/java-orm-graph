@@ -1,0 +1,49 @@
+tbl_account as Account {
+    id : Integer
+    date_created : [dateCreated, DateTime]
+}
+
+tbl_address as Address {
+    id : Integer
+    street_name : [streetName, String]
+    unit_number : [unitNum, String]
+    zip_code : [zipCode, String]
+}
+
+tbl_seller as Seller {
+    id : Integer
+    first_name : [firstName, String]
+    last_name : [lastName, String]
+    email_address : [emailAddress, String]
+    date_created : [dateCreated, DateTime]
+    seller_account : [sellerAccount, Account]
+    seller_address : [sellerAddress, Address]
+    billing_address : [billingAddress, Address]
+}
+
+tbl_sale_item as SaleItem {
+    price: BigDecimal
+    quantity: Integer
+    date_added : [dateAdded, DateTime]
+    item_seller: [itemSeller, Seller]
+    item_location: [itemLocation, Address]
+}
+
+tbl_music_album as MusicAlbum {
+    price: BigDecimal
+    release_date: [releaseDate, Date]
+}
+
+tbl_songs as Song {
+    (album, artist): [album, MusicAlbum]
+}
+
+tbl_listener as Listener {
+    id : Integer
+}
+
+tbl_requested as Requested {
+    id : Integer
+    listener: Listener
+    song: Song
+}
