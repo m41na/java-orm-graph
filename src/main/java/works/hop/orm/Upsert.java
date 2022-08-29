@@ -1,6 +1,7 @@
 package works.hop.orm;
 
-import works.hop.entity.Address;
+import works.hop.entity.Account;
+import works.hop.entity.Seller;
 import works.hop.generate.Entity;
 import works.hop.generate.EntityGen;
 import works.hop.generate.TypeResolver;
@@ -12,37 +13,28 @@ import java.net.URISyntaxException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public class Insert {
+public class Upsert {
 
-    public static <T extends Entity> int insert(Connection conn, T entity, Map<String, EntityNode> mappings) {
+    public static <T extends Entity> int upsert(Connection conn, T entity, Map<String, EntityNode> mappings) {
         Optional<EntityNode> optNode = mappings.entrySet().stream()
                 .filter(f -> String.format("%s.%s", f.getValue().getNamespace(), f.getValue().getName()).equals(entity.getClass().getName()))
                 .findAny().map(Map.Entry::getValue);
         if (optNode.isEmpty()) {
             throw new RuntimeException(String.format("No mapping is available for %s", entity.getClass().getName()));
         }
+
         EntityNode node = optNode.get();
         String targetTable = node.getTable();
         List<Col> columns = Schema.columns(targetTable);
+        List<IdxCol> uniques = Schema.indexed(targetTable);
 
-        try {
-            List<String> pks = Schema.pkColumns(targetTable).stream().map(p -> p.name).collect(Collectors.toList());
-            for (FieldNode fn : node.getFields().values()) {
-                if (pks.contains(fn.getColumn()) &&
-                        entity.getProperty(fn.getName(), TypeResolver.resolveClass(node.getNamespace(), fn.getType())) != null) {
-                    throw new RuntimeException(String.format("Expected %s to be have no value", fn.getName()));
-                }
-            }
-        } catch (Throwable e) {
-            throw new RuntimeException(e);
-        }
-
-        Object[][] criteria = extractInsertParams(entity, node);
-        String query = generateInsertQuery(targetTable, columns, criteria);
+        Object[][] criteria = extractUpsertParams(entity, node);
+        String query = generateUpsertQuery(targetTable, columns, uniques, criteria);
         System.out.printf("Execute query - %s%n", query);
         try (PreparedStatement prep = conn.prepareStatement(query)) {
             for (int i = 0; i < criteria.length; i++) {
@@ -59,10 +51,7 @@ public class Insert {
         }
     }
 
-    private static <T extends Entity> Object[][] extractInsertParams(T entity, EntityNode node) {
-        List<String> pks = Schema.pkColumns(node.getTable()).stream()
-                .map(pk -> pk.name)
-                .collect(Collectors.toList());
+    private static <T extends Entity> Object[][] extractUpsertParams(T entity, EntityNode node) {
         List<FieldNode> insertable = node.getFields().values().stream()
                 .filter(fNode -> {
                     try {
@@ -74,7 +63,6 @@ public class Insert {
                         throw new RuntimeException(e);
                     }
                 })
-                .filter(fNode -> !pks.contains(fNode.getColumn()))
                 .collect(Collectors.toList());
         Object[][] params = new Object[insertable.size()][];
         int i = 0;
@@ -91,10 +79,11 @@ public class Insert {
         return params;
     }
 
-    public static <T extends Entity> int insert(Connection conn, String targetTable, Object[][] criteria) {
+    public static <T extends Entity> int upsert(Connection conn, String targetTable, Object[][] criteria) {
         List<Col> columns = Schema.columns(targetTable);
+        List<IdxCol> uniques = Schema.indexed(targetTable);
 
-        String query = generateInsertQuery(targetTable, columns, criteria);
+        String query = generateUpsertQuery(targetTable, columns, uniques, criteria);
         System.out.printf("Execute query - %s%n", query);
         try (PreparedStatement prep = conn.prepareStatement(query)) {
             for (int i = 0; i < criteria.length; i++) {
@@ -110,13 +99,9 @@ public class Insert {
         }
     }
 
-    private static String generateInsertQuery(String targetTable, List<Col> columns, Object[][] params) {
-        StringBuilder query = new StringBuilder("insert into ");
-        query.append(targetTable).append(" (");
-        List<String> queryColumns = Stream.of(params)
-                .filter(Objects::nonNull)
-                .filter(arr -> arr[0] != null && arr[1] != null)
-                .map(arr -> (String) arr[0]).collect(Collectors.toList());
+    private static String generateUpsertQuery(String targetTable, List<Col> columns, List<IdxCol> uniques, Object[][] params) {
+        StringBuilder query = new StringBuilder("insert into ").append(targetTable).append(" (");
+        List<String> queryColumns = Stream.of(params).map(arr -> (String) arr[0]).collect(Collectors.toList());
         Map<String, Col> targetColumns = new LinkedHashMap<>();
         for (String param : queryColumns) {
             Optional<Col> colOption = columns.stream().filter(c -> c.name.equals(param)).findAny();
@@ -128,19 +113,22 @@ public class Insert {
             }
         }
 
-        int i = 0;
-        for (Col col : targetColumns.values()) {
-            if (!col.autoIncr) {
+        for(Iterator<String> iter = targetColumns.keySet().iterator(); iter.hasNext();){
+            Col col = targetColumns.get(iter.next());
+//            if (!col.autoIncr) {
                 String colName = col.name;
                 query.append(colName);
-                if (i < targetColumns.size() - 1) {
-                    query.append(",");
-                }
+//            }
+//            else{
+//                iter.remove();
+//            }
+            //add comma if necessary
+            if (iter.hasNext()) {
+                query.append(",");
             }
-            i++;
         }
 
-        query.append(") select ");
+        query.append(") values (");
         for (int j = 0; j < targetColumns.size(); j++) {
             query.append("?");
             if (j < targetColumns.size() - 1) {
@@ -148,57 +136,92 @@ public class Insert {
             }
         }
 
-        query.append(" where not exists (select * from ").append(targetTable).append(" where ");
+        query.append(") on conflict (");
+        for (int k = 0; k < uniques.size(); k++) {
+            IdxCol idx = uniques.get(k);
+            String colName = idx.column;
+            query.append(colName);
+            if (k < uniques.size() - 1) {
+                query.append(",");
+            }
+        }
 
-        int k = 0;
+        query.append(") do update set ");
+        int l = 0;
         for (Col col : targetColumns.values()) {
             String colName = col.name;
-            if (params[k][1] != null) {
+            if (params[l][1] != null) {
                 query.append(colName).append("=?");
             } else {
                 query.append(colName).append(" is ?");
             }
-            if (k < targetColumns.size() - 1) {
-                query.append(" and ");
+            if (l < targetColumns.size() - 1) {
+                query.append(",");
             }
-            k++;
+            l++;
         }
-
-        return query.append(")").toString();
+        return query.toString();
     }
 
-    public static void main(String[] args) throws SQLException, IOException, URISyntaxException {
-//        String addressTable = "tbl_address";
-//        List<Col> addrColumns = Schema.columns(addressTable);
-//
-//        Object[][] data1 = new Object[][]{
-//                new Object[]{"street_name", "Daraja tatuv"},
-//                new Object[]{"city", "Madison"},
-//                new Object[]{"state", "WI"},
-//                new Object[]{"zip_code", "53718"},
-//        };
-//        String insertAddress = generateInsertQuery(addressTable, addrColumns, data1);
-//        System.out.printf("generated query -> %s%n", insertAddress);
-//
+    public static void main(String[] args) throws IOException, URISyntaxException, SQLException {
         Transact tx = Connect.transact();
+
+        String accountsTable = "tbl_account";
+//        List<Col> accColumns = Schema.columns(accountsTable);
+//        List<IdxCol> accUniques = Schema.indexed(accountsTable);
+//
+//        Object[][] data2 = new Object[][]{
+//                new Object[]{"username", "Darajam"},
+//                new Object[]{"password", "daraja-1"},
+//                new Object[]{"date_created", LocalDateTime.now()},
+//        };
+//        String upsertAccount = generateUpsertQuery(accountsTable, accColumns, accUniques, data2);
+//        System.out.printf("generated query -> %s%n", upsertAccount);
+//
 //        tx.start(conn -> {
-//            int rows1 = insert(conn, addressTable, data1);
-//            System.out.printf("Rows affected: %d%n", rows1);
+//            int rows2 = upsert(conn, accountsTable, data2);
+//            System.out.printf("Rows affected: %d%n", rows2);
 //        });
 //
+//        String sellersTable = "tbl_seller";
+//        List<Col> sellerColumns = Schema.columns(sellersTable);
+//        List<IdxCol> sellerUniques = Schema.indexed(sellersTable);
+//
+//        Object[][] data3 = new Object[][]{
+//                new Object[]{"first_name", "jina"},
+//                new Object[]{"last_name", "mwisho"},
+//                new Object[]{"email_address", "jina@email.com"},
+//                new Object[]{"seller_address", 10},
+//                new Object[]{"billing_address", 6},
+//                new Object[]{"seller_account", 1},
+//                new Object[]{"date_created", LocalDateTime.now()},
+//        };
+//        String upsertSeller = generateUpsertQuery(sellersTable, sellerColumns, sellerUniques, data3);
+//        System.out.printf("query -> %s%n", upsertSeller);
+//
+//        tx.start(conn -> {
+//            int rows3 = Insert.upsert(conn, sellersTable, data3);
+//            System.out.printf("Rows affected: %d%n", rows3);
+//        });
 
         EntityGen gen = new EntityGen();
         Map<String, EntityNode> mappings = gen.entities();
 
-        Address address = new Address();
-        address.setStreetName("Daraja tatuv");
-        address.setCity("Madison");
-        address.setState("WI");
-        address.setZipCode("53718");
+        Account account = new Account();
+        account.setId(7);
+        account.setUsername("Daraja tatuv");
+        account.setPassword("Madison");
+        account.setDateCreated(LocalDateTime.now());
 
         tx.start(conn -> {
-            int rows4 = insert(conn, address, mappings);
+            int rows4 = upsert(conn, account, mappings);
             System.out.printf("rows affected -> %d%n", rows4);
         });
+
+//        Seller seller = new Seller();
+//        seller.setFirstName("jim");
+//        seller.setLastName("bob");
+//        seller.setEmailAddress("jim.bob@email.com");
+//        seller.setSellerAccount(account);
     }
 }

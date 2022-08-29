@@ -1,17 +1,28 @@
 package works.hop.orm;
 
+import com.zaxxer.hikari.HikariDataSource;
+
+import java.io.IOException;
 import java.sql.*;
 
 public class Connect {
 
-    //    static String databaseUrl = "jdbc:sqlite:./data/orm-graph-0.db";
-    static String databaseUrl = "jdbc:postgresql://localhost:5432/postgres";
+    //before anything else, initialize app config class
+    static {
+        try {
+            AppConfig.load("app.yaml");
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    static HikariDataSource db = AppConfig.ds;
 
     public static void establishConnection() {
         Connection conn = null;
         try {
             // create a connection to the database
-            conn = DriverManager.getConnection(databaseUrl, "postgres", "pgadmin");
+            conn = db.getConnection();
 
             System.out.println("Connection to SQLite has been established.");
 
@@ -46,7 +57,7 @@ public class Connect {
 
     public static void createNewTable(String tableDefinition) {
 
-        try (Connection conn = DriverManager.getConnection(databaseUrl);
+        try (Connection conn = db.getConnection();
              Statement stmt = conn.createStatement()) {
             // create a new table
             stmt.execute(tableDefinition);
@@ -58,7 +69,7 @@ public class Connect {
     public static Connection connect() {
         Connection conn = null;
         try {
-            conn = DriverManager.getConnection(databaseUrl, "postgres", "pgadmin");
+            conn = db.getConnection();
         } catch (SQLException e) {
             System.out.println(e.getMessage());
         }

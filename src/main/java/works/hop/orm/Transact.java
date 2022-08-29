@@ -5,6 +5,7 @@ import java.sql.SQLException;
 
 public class Transact {
 
+    final Object sync = new Object();
     Connection conn;
     boolean started;
 
@@ -17,10 +18,11 @@ public class Transact {
     }
 
     public void start(Transaction operation) throws SQLException {
-        synchronized (this) {
+        synchronized (sync) {
             if (!started) {
                 conn = Connect.connect();
                 conn.setAutoCommit(false);
+                started = true;
                 try {
                     operation.execute(conn);
                     commit();
@@ -35,26 +37,25 @@ public class Transact {
         }
     }
 
-    public void commit() throws SQLException {
+    void commit() throws SQLException {
         if (started && conn != null) {
             conn.commit();
+            started = false;
         }
     }
 
-    public void rollback() throws SQLException {
+    void rollback() throws SQLException {
         if (started && conn != null) {
             conn.rollback();
+            started = false;
         }
     }
 
-    public void close() {
+    void close() {
         try {
-            synchronized (this) {
-                if (conn != null) {
-                    conn.close();
-                    conn = null;
-                    started = false;
-                }
+            if (conn != null) {
+                conn.close();
+                conn = null;
             }
         } catch (SQLException e) {
             throw new RuntimeException("Unable to successfully close database connection", e);

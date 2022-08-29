@@ -103,9 +103,14 @@ public class Schema {
         try (Connection connection = Connect.connect()) {
             List<IdxCol> idxCols = new ArrayList<>();
             DatabaseMetaData databaseMetaData = connection.getMetaData();
-            try (ResultSet IDX = databaseMetaData.getIndexInfo(null, null, tableName, true, true)) {
+            try (ResultSet IDX = databaseMetaData.getIndexInfo(null, null, tableName, true, true);
+                 ResultSet PK = databaseMetaData.getPrimaryKeys(null, null, tableName)) {
                 System.out.println("------------INDEXED COLUMNS-------------");
                 while (IDX.next()) {
+                    if(PK.next() && PK.getString("COLUMN_NAME").equals(IDX.getString("COLUMN_NAME"))) {
+                        //ignore column if it's a pk
+                        continue;
+                    }
                     String name = IDX.getString("INDEX_NAME");
                     String column = IDX.getString("COLUMN_NAME");
                     String ordinal = IDX.getString("ORDINAL_POSITION");
@@ -143,21 +148,13 @@ public class Schema {
         for (String tableName : tables(DATA_TABLES)) {
             System.out.printf("Table name - %s%n", tableName);
             System.out.println("table columns");
-            columns(tableName).forEach(col -> {
-                System.out.printf("%s%n", col);
-            });
+            columns(tableName).forEach(col -> System.out.printf("%s%n", col));
             System.out.println("table pk columns");
-            pkColumns(tableName).forEach(col -> {
-                System.out.printf("%s%n", col);
-            });
+            pkColumns(tableName).forEach(col -> System.out.printf("%s%n", col));
             System.out.println("table fk columns");
-            fkColumns(tableName).forEach(col -> {
-                System.out.printf("%s%n", col);
-            });
+            fkColumns(tableName).forEach(col -> System.out.printf("%s%n", col));
             System.out.println("table idx columns");
-            indexed(tableName).forEach(col -> {
-                System.out.printf("%s%n", col);
-            });
+            indexed(tableName).forEach(col -> System.out.printf("%s%n", col));
         }
         tables(SYSTEM_TABLES);
     }

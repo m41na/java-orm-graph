@@ -15,6 +15,13 @@ public interface Entity {
         mh.invoke(this, value);
     }
 
+    default Object getProperty(String name, Class<?> type) throws Throwable {
+        String getter = String.format("get%s%s", Character.toUpperCase(name.charAt(0)), name.substring(1));
+        MethodType mt = MethodType.methodType(type);
+        MethodHandle mh = lookup.findVirtual(this.getClass(), getter, mt);
+        return mh.invoke(this);
+    }
+
     static <T extends Entity> T instance(Class<?> type) throws Throwable {
         MethodType noArgsConstructor = MethodType.methodType(void.class);
         MethodHandle noArgConstructorHandle = lookup.findConstructor(type, noArgsConstructor);
