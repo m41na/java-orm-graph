@@ -23,9 +23,4 @@ public class Address implements Entity {
   private String streetName;
 
   private String zipCode;
-
-  public static void main(String[] args) throws Throwable {
-    Address addr = new Address("", "city", 1, "WI", "street1", "00100");
-    System.out.println(addr.getProperty("state", String.class));
-  }
 }

@@ -18,7 +18,7 @@ public class Tokenizer {
     static String OPEN_PAREN = "OPEN_PAREN";
     static String CLOSE_PAREN = "CLOSE_PAREN";
     static String COMMA = "COMMA";
-    static String SEMI_COLON = "SEMI_COLON";
+    static String COLON = "COLON";
     static String LITERAL = "LITERAL";
     static String IDENTIFIER = "IDENTIFIER";
     static String AS = "as";
@@ -39,7 +39,7 @@ public class Tokenizer {
         symbols.put("(", OPEN_PAREN);
         symbols.put(")", CLOSE_PAREN);
         symbols.put(",", COMMA);
-        symbols.put(":", SEMI_COLON);
+        symbols.put(":", COLON);
 
         identifiers.add(AS);
     }

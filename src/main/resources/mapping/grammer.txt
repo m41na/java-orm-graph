@@ -1,0 +1,15 @@
+entity_definition := table_name (as entity_name) open_curly field_definitions close_curly
+field_definitions := (single_field_definition | multi_field_definition) field_definitions*
+simple_field_definition := field_name colon (field_type | property_field_type)
+multi_field_definition := open_paren column_names close_paren colon property_field_type
+property_field_type := open_bracket property_name comma field_type close_bracket
+column_names := column_name (comma column_name)+
+field_type := (type_name | entity_name)
+as := identifier
+column_name := String
+property_name := String
+field_name := String
+entity_name := String
+table_name := String
+type_name := (Integer | Long | BigDecimal | String | Date | DateTime)
+

@@ -7,9 +7,14 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class FieldNode {
+public class FieldNode implements Visitable{
 
     String name;
     String column;
     String type;
+
+    @Override
+    public void accept(Visitor visitor) {
+        visitor.visitField(this);
+    }
 }
