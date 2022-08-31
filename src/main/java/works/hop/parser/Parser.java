@@ -3,7 +3,7 @@ package works.hop.parser;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import works.hop.parser.data.*;
+import works.hop.parser.bricks.*;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
